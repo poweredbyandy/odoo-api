@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <template id="webclient_bootstrap_oauth_embed" inherit_id="web.webclient_bootstrap">
+        <xpath expr="//script[contains(., 'load_menus')]" position="replace">
+            <script type="text/javascript">
+                // Block to avoid leaking variables in the script scope
+                {
+                    odoo.__session_info__ = <t t-out="json.dumps(session_info)"/>;
+                    const { user_context, cache_hashes } = odoo.__session_info__;
+                    const pageParams = new URLSearchParams(document.location.search);
+                    const lang = pageParams.get("lang");
+                    const embedToken = pageParams.get("oauth_embed_token");
+                    const embedDb = pageParams.get("db");
+                    if (embedToken) {
+                        sessionStorage.setItem("oauth_provider_embed_token", embedToken);
+                    }
+                    if (embedDb) {
+                        sessionStorage.setItem("oauth_provider_embed_db", embedDb);
+                    }
+                    if (!sessionStorage.getItem("oauth_provider_color_scheme")) {
+                        const prefersDark = window.matchMedia(
+                            "(prefers-color-scheme: dark)"
+                        ).matches;
+                        sessionStorage.setItem(
+                            "oauth_provider_color_scheme",
+                            prefersDark ? "dark" : "light"
+                        );
+                    }
+                    const appendEmbedQuery = (url) => {
+                        if (!embedToken) {
+                            return url;
+                        }
+                        const parsed = new URL(url, document.location.origin);
+                        if (!parsed.searchParams.has("oauth_embed_token")) {
+                            parsed.searchParams.set("oauth_embed_token", embedToken);
+                        }
+                        if (embedDb &amp;&amp; !parsed.searchParams.has("db")) {
+                            parsed.searchParams.set("db", embedDb);
+                        }
+                        return parsed.pathname + parsed.search;
+                    };
+                    const embedFetch = (url, init) => {
+                        const nextUrl = appendEmbedQuery(url);
+                        const nextInit = Object.assign({}, init || {});
+                        if (embedToken) {
+                            const headers = new Headers(nextInit.headers);
+                            headers.set("X-OAuth-Embed-Token", embedToken);
+                            if (embedDb) {
+                                headers.set("X-OAuth-Embed-Db", embedDb);
+                            }
+                            nextInit.headers = headers;
+                        }
+                        return fetch(nextUrl, nextInit);
+                    };
+                    let menuURL = `/web/webclient/load_menus/${cache_hashes.load_menus}`;
+                    const menuParams = new URLSearchParams();
+                    if (lang) {
+                        user_context.lang = lang;
+                        menuParams.set("lang", lang);
+                    }
+                    if (embedToken) {
+                        menuParams.set("oauth_embed_token", embedToken);
+                    }
+                    if (embedDb) {
+                        menuParams.set("db", embedDb);
+                    }
+                    const menuQuery = menuParams.toString();
+                    if (menuQuery) {
+                        menuURL += `?${menuQuery}`;
+                    }
+                    odoo.reloadMenus = () =>
+                        embedFetch(menuURL).then((res) => {
+                            if (embedToken) {
+                                console.warn(
+                                    "[oauth_provider.embed.debug]",
+                                    "load_menus response",
+                                    { status: res.status, ok: res.ok, url: menuURL }
+                                );
+                            }
+                            if (!res.ok) {
+                                throw new Error("load_menus HTTP " + res.status);
+                            }
+                            return res.json();
+                        });
+                    odoo.loadMenusPromise = odoo.reloadMenus().catch((err) => {
+                        console.error(
+                            "[oauth_provider.embed.debug]",
+                            "loadMenusPromise bootstrap error",
+                            err
+                        );
+                        throw err;
+                    });
+                    embedFetch(
+                        `/web/webclient/translations/${cache_hashes.translations}?lang=${user_context.lang}`
+                    );
+                }
+            </script>
+        </xpath>
+    </template>
+</odoo>

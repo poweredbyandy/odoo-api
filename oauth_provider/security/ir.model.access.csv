@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_oauth_provider_client,access.oauth.provider.client,model_oauth_provider_client,base.group_system,1,1,1,1
+access_oauth_provider_token,access.oauth.provider.token,model_oauth_provider_token,base.group_system,1,1,1,1
+access_oauth_provider_pending,access.oauth.provider.pending,model_oauth_provider_pending,base.group_system,1,1,1,1
