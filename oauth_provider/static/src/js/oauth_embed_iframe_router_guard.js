@@ -133,6 +133,59 @@ function resolvedColorScheme() {
     return scheme;
 }
 
+function makeEmbedLocation(nativeLocation) {
+    const locationFacade = {
+        assign(url) {
+            nativeLocation.assign(url);
+        },
+        replace(url) {
+            nativeLocation.replace(url);
+        },
+        reload() {
+            console.warn(LOG, "location.reload suprimido en embed");
+            console.trace(LOG);
+        },
+        toString() {
+            return nativeLocation.href;
+        },
+        valueOf() {
+            return nativeLocation.href;
+        },
+        [Symbol.toPrimitive]() {
+            return nativeLocation.href;
+        },
+    };
+    for (const prop of [
+        "href",
+        "protocol",
+        "host",
+        "hostname",
+        "port",
+        "pathname",
+        "search",
+        "hash",
+    ]) {
+        Object.defineProperty(locationFacade, prop, {
+            enumerable: true,
+            configurable: true,
+            get() {
+                return nativeLocation[prop];
+            },
+            set(value) {
+                nativeLocation[prop] = value;
+            },
+        });
+    }
+    Object.defineProperty(locationFacade, "origin", {
+        enumerable: true,
+        configurable: true,
+        get() {
+            return nativeLocation.origin;
+        },
+    });
+    return locationFacade;
+}
+
 if (embedContext()) {
     patch(cookie, {
         get(key) {
@@ -151,28 +204,11 @@ if (embedContext()) {
     });
 
     const nativeLocation = window.location;
+    const embedLocation = makeEmbedLocation(nativeLocation);
     Object.defineProperty(browser, "location", {
         configurable: true,
         get() {
-            return new Proxy(nativeLocation, {
-                get(target, prop) {
-                    if (prop === "reload") {
-                        return function () {
-                            console.warn(LOG, "location.reload suprimido en embed");
-                            console.trace(LOG);
-                        };
-                    }
-                    const value = target[prop];
-                    if (typeof value === "function") {
-                        return value.bind(target);
-                    }
-                    return value;
-                },
-                set(target, prop, value) {
-                    target[prop] = value;
-                    return true;
-                },
-            });
+            return embedLocation;
         },
         set(val) {
             window.location = val;
